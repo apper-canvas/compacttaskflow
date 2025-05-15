@@ -149,7 +149,7 @@ function App() {
   // Don't render routes until initialization is complete
   if (!isInitialized) {
     return (
-      {/* Theme Toggle Button */}
+      <>{/* Theme Toggle Button */}
       <motion.button
         className="fixed z-50 bottom-5 right-5 p-3 rounded-full bg-primary bg-opacity-90 text-white shadow-lg hover:bg-primary-dark transition-all"
         whileTap={{ scale: 0.9 }}
@@ -168,7 +168,7 @@ function App() {
           <p className="text-surface-600 dark:text-surface-400">Initializing application...</p>
         </div>
       </div>
-    )
+    </>)
   }
   
   return (
