@@ -146,6 +146,32 @@ function App() {
   const SunIcon = getIcon('SunMedium');
   const MoonIcon = getIcon('Moon');
 
+  // Don't render routes until initialization is complete
+  if (!isInitialized) {
+    return (
+      {/* Theme Toggle Button */}
+      <motion.button
+        className="fixed z-50 bottom-5 right-5 p-3 rounded-full bg-primary bg-opacity-90 text-white shadow-lg hover:bg-primary-dark transition-all"
+        whileTap={{ scale: 0.9 }}
+        onClick={toggleDarkMode}
+        aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        {darkMode ? (
+          <SunIcon className="w-5 h-5" />
+        ) : (
+          <MoonIcon className="w-5 h-5" />
+        )}
+      </motion.button>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-surface-600 dark:text-surface-400">Initializing application...</p>
+        </div>
+      </div>
+    )
+  }
+  
+  return (
     <div className="min-h-screen bg-surface-50 dark:bg-surface-900 text-surface-800 dark:text-surface-100 transition-colors duration-300">
       {/* Theme Toggle Button */}
       <motion.button
@@ -160,49 +186,36 @@ function App() {
           <MoonIcon className="w-5 h-5" />
         )}
       </motion.button>
-  
-  // Don't render routes until initialization is complete
-  if (!isInitialized) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-surface-600 dark:text-surface-400">Initializing application...</p>
-        </div>
-      </div>
-    );
-  }
-  
-  return (
-    <AuthContext.Provider value={authMethods}>
-     <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/callback" element={<Callback />} />
-        <Route path="/error" element={<ErrorPage />} />
-        <Route path="/" element={
-          <ProtectedRoute>
-            <Home />
-          </ProtectedRoute>
-        } />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
 
-      {/* Toast Container Configuration */}
-      <ToastContainer
-        position="bottom-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme={darkMode ? 'dark' : 'light'}
-        toastClassName="text-sm font-medium"
-      />
-    </AuthContext.Provider>
+      <AuthContext.Provider value={authMethods}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/callback" element={<Callback />} />
+          <Route path="/error" element={<ErrorPage />} />
+          <Route path="/" element={
+            <ProtectedRoute>
+              <Home />
+            </ProtectedRoute>
+          } />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+
+        {/* Toast Container Configuration */}
+        <ToastContainer
+          position="bottom-right"
+          autoClose={3000}
+          hideProgressBar={false}
+          newestOnTop
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme={darkMode ? 'dark' : 'light'}
+          toastClassName="text-sm font-medium"
+        />
+      </AuthContext.Provider>
     </div>
   );
 }
