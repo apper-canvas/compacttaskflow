@@ -110,6 +110,8 @@ function MainFeature({ onTasksUpdate }) {
     addTaskAsync();
   };
 
+  // Toggle task completion status
+  const handleToggleComplete = (id) => {
     const toggleTaskAsync = async () => {
       try {
         await toggleTaskCompletion(id);
@@ -123,16 +125,25 @@ function MainFeature({ onTasksUpdate }) {
     };
     
     toggleTaskAsync();
+    
+    // Optimistic UI update
     setTasks(prevTasks => 
       prevTasks.map(task => 
         task.id === id 
-          ? { ...task, isCompleted: !task.isCompleted } 
+          ? { ...task, is_completed: !task.is_completed } 
           : task
       )
     );
   };
 
   // Start editing a task
+  const handleStartEdit = (task) => {
+    setEditingId(task.id);
+    setEditValue(task.title);
+    setEditDescription(task.description || '');
+    setEditPriority(task.priority);
+  };
+  
   // Delete a task
   const handleDeleteTask = (id) => {
     const deleteTaskAsync = async () => {
@@ -176,15 +187,8 @@ function MainFeature({ onTasksUpdate }) {
         toast.error('Failed to update task');
       }
     };
-    
+
     updateTaskAsync();
-            } 
-          : task
-      )
-    );
-    
-    setEditingId(null);
-    toast.success("Task updated");
   };
 
   // Cancel editing
