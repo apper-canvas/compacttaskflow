@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
@@ -38,6 +38,10 @@ function MainFeature({ onTasksUpdate }) {
   // UI state
   const [isFormExpanded, setIsFormExpanded] = useState(false);
 
+  // Use ref to store the latest onTasksUpdate callback
+  // This prevents infinite render loops with the useEffect dependency array
+  const onTasksUpdateRef = useRef(onTasksUpdate);
+
   // Load tasks from localStorage on component mount
   useEffect(() => {
     const savedTasks = JSON.parse(localStorage.getItem('tasks')) || [];
@@ -47,12 +51,16 @@ function MainFeature({ onTasksUpdate }) {
   // Save tasks to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('tasks', JSON.stringify(tasks));
+
+    // Update the ref with the latest callback
+    onTasksUpdateRef.current = onTasksUpdate;
     
     // Notify parent component about task updates
-    if (onTasksUpdate) {
-      onTasksUpdate();
+    // Using the ref prevents adding onTasksUpdate to the dependency array
+    if (onTasksUpdateRef.current) {
+      onTasksUpdateRef.current();
     }
-  }, [tasks, onTasksUpdate]);
+  }, [tasks]); // Only depend on tasks
 
   // Add new task
   const handleAddTask = (e) => {
