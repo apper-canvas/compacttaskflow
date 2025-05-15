@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { toast } from 'react-toastify';
 import getIcon from '../utils/iconUtils';
+import { fetchTasks, createTask, updateTask, deleteTask, toggleTaskCompletion } from '../services/TaskService';
 
 // Icon definitions
 const PlusIcon = getIcon('Plus');
@@ -34,6 +35,7 @@ function MainFeature({ onTasksUpdate }) {
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState('newest');
+  const [isTasksLoading, setIsTasksLoading] = useState(true);
   
   // UI state
   const [isFormExpanded, setIsFormExpanded] = useState(false);
@@ -42,25 +44,34 @@ function MainFeature({ onTasksUpdate }) {
   // This prevents infinite render loops with the useEffect dependency array
   const onTasksUpdateRef = useRef(onTasksUpdate);
 
-  // Load tasks from localStorage on component mount
-  useEffect(() => {
-    const savedTasks = JSON.parse(localStorage.getItem('tasks')) || [];
-    setTasks(savedTasks);
+  // Load tasks from database on component mount
+  const loadTasks = useCallback(async () => {
+    try {
+      setIsTasksLoading(true);
+      const tasksData = await fetchTasks();
+      setTasks(tasksData);
+      
+      // Call the parent component's update function
+      if (onTasksUpdateRef.current) {
+        onTasksUpdateRef.current();
+      }
+    } catch (error) {
+      console.error('Error loading tasks:', error);
+      toast.error('Failed to load tasks');
+    } finally {
+      setIsTasksLoading(false);
+    }
   }, []);
 
-  // Save tasks to localStorage whenever they change
   useEffect(() => {
-    localStorage.setItem('tasks', JSON.stringify(tasks));
-
     // Update the ref with the latest callback
     onTasksUpdateRef.current = onTasksUpdate;
-    
-    // Notify parent component about task updates
-    // Using the ref prevents adding onTasksUpdate to the dependency array
-    if (onTasksUpdateRef.current) {
-      onTasksUpdateRef.current();
-    }
-  }, [tasks]); // Only depend on tasks
+  }, [onTasksUpdate]);
+
+  // Load tasks on component mount
+  useEffect(() => {
+    loadTasks();
+  }, [loadTasks]);
 
   // Add new task
   const handleAddTask = (e) => {
@@ -70,33 +81,48 @@ function MainFeature({ onTasksUpdate }) {
       toast.error("Task title cannot be empty");
       return;
     }
-    
+
     const newTaskObj = {
-      id: Date.now().toString(),
       title: newTask.trim(),
       description: taskDescription.trim(),
       priority: taskPriority,
-      isCompleted: false,
-      createdAt: new Date().toISOString(),
+      is_completed: false,
     };
     
-    setTasks(prevTasks => [newTaskObj, ...prevTasks]);
-    setNewTask('');
-    setTaskDescription('');
-    setTaskPriority('medium');
-    setIsFormExpanded(false);
+    const addTaskAsync = async () => {
+      try {
+        const createdTask = await createTask(newTaskObj);
+        // Refresh task list
+        await loadTasks();
+        
+        setNewTask('');
+        setTaskDescription('');
+        setTaskPriority('medium');
+        setIsFormExpanded(false);
+        
+        toast.success("Task added successfully");
+      } catch (error) {
+        console.error('Error adding task:', error);
+        toast.error('Failed to add task');
+      }
+    };
     
-    toast.success("Task added successfully");
+    addTaskAsync();
   };
 
-  // Delete a task
-  const handleDeleteTask = (id) => {
-    setTasks(prevTasks => prevTasks.filter(task => task.id !== id));
-    toast.success("Task deleted");
-  };
-
-  // Toggle task completion status
-  const handleToggleComplete = (id) => {
+    const toggleTaskAsync = async () => {
+      try {
+        await toggleTaskCompletion(id);
+        // Refresh task list
+        await loadTasks();
+        toast.success("Task status updated");
+      } catch (error) {
+        console.error('Error toggling task completion:', error);
+        toast.error('Failed to update task status');
+      }
+    };
+    
+    toggleTaskAsync();
     setTasks(prevTasks => 
       prevTasks.map(task => 
         task.id === id 
@@ -107,11 +133,21 @@ function MainFeature({ onTasksUpdate }) {
   };
 
   // Start editing a task
-  const handleStartEdit = (task) => {
-    setEditingId(task.id);
-    setEditValue(task.title);
-    setEditDescription(task.description);
-    setEditPriority(task.priority);
+  // Delete a task
+  const handleDeleteTask = (id) => {
+    const deleteTaskAsync = async () => {
+      try {
+        await deleteTask(id);
+        // Refresh task list
+        await loadTasks();
+        toast.success("Task deleted successfully");
+      } catch (error) {
+        console.error('Error deleting task:', error);
+        toast.error('Failed to delete task');
+      }
+    };
+    
+    deleteTaskAsync();
   };
 
   // Save edited task
@@ -121,14 +157,27 @@ function MainFeature({ onTasksUpdate }) {
       return;
     }
     
-    setTasks(prevTasks => 
-      prevTasks.map(task => 
-        task.id === id 
-          ? { 
-              ...task, 
-              title: editValue.trim(),
-              description: editDescription.trim(),
-              priority: editPriority 
+    const updatedTask = {
+      Id: id,
+      title: editValue.trim(),
+      description: editDescription.trim(),
+      priority: editPriority
+    };
+    
+    const updateTaskAsync = async () => {
+      try {
+        await updateTask(updatedTask);
+        // Refresh task list
+        await loadTasks();
+        setEditingId(null);
+        toast.success("Task updated successfully");
+      } catch (error) {
+        console.error('Error updating task:', error);
+        toast.error('Failed to update task');
+      }
+    };
+    
+    updateTaskAsync();
             } 
           : task
       )
@@ -148,13 +197,13 @@ function MainFeature({ onTasksUpdate }) {
     // Apply status filter
     const statusMatch = 
       filterStatus === 'all' || 
-      (filterStatus === 'completed' && task.isCompleted) || 
-      (filterStatus === 'active' && !task.isCompleted);
+      (filterStatus === 'completed' && task.is_completed) || 
+      (filterStatus === 'active' && !task.is_completed);
     
     // Apply search filter
     const searchMatch = 
-      task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      task.description.toLowerCase().includes(searchQuery.toLowerCase());
+      task.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      task.description?.toLowerCase().includes(searchQuery.toLowerCase());
     
     return statusMatch && searchMatch;
   });
@@ -163,9 +212,9 @@ function MainFeature({ onTasksUpdate }) {
   const sortedTasks = [...filteredTasks].sort((a, b) => {
     switch (sortOrder) {
       case 'newest':
-        return new Date(b.createdAt) - new Date(a.createdAt);
+        return new Date(b.created_at) - new Date(a.created_at);
       case 'oldest':
-        return new Date(a.createdAt) - new Date(b.createdAt); 
+        return new Date(a.created_at) - new Date(b.created_at); 
       case 'priority':
         const priorityOrder = { high: 0, medium: 1, low: 2 };
         return priorityOrder[a.priority] - priorityOrder[b.priority];
@@ -356,7 +405,12 @@ function MainFeature({ onTasksUpdate }) {
       
       {/* Task list */}
       <div className="space-y-4">
-        {sortedTasks.length === 0 ? (
+        {isTasksLoading ? (
+          <div className="task-card text-center py-12">
+            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-surface-600 dark:text-surface-400">Loading tasks...</p>
+          </div>
+        ) : sortedTasks.length === 0 ? (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -383,7 +437,7 @@ function MainFeature({ onTasksUpdate }) {
                 exit={{ opacity: 0, height: 0, marginBottom: 0 }}
                 transition={{ duration: 0.2 }}
                 className={`task-card relative ${
-                  task.isCompleted ? 'bg-opacity-60 dark:bg-opacity-60' : ''
+                  task.is_completed ? 'bg-opacity-60 dark:bg-opacity-60' : ''
                 }`}
               >
                 {editingId === task.id ? (
@@ -445,11 +499,11 @@ function MainFeature({ onTasksUpdate }) {
                         <button
                           onClick={() => handleToggleComplete(task.id)}
                           className={`mt-1 flex-shrink-0 text-surface-400 hover:text-primary transition-colors ${
-                            task.isCompleted ? 'text-secondary' : ''
+                            task.is_completed ? 'text-secondary' : ''
                           }`}
-                          aria-label={task.isCompleted ? "Mark as incomplete" : "Mark as complete"}
+                          aria-label={task.is_completed ? "Mark as incomplete" : "Mark as complete"}
                         >
-                          {task.isCompleted ? (
+                          {task.is_completed ? (
                             <CheckCircleIcon className="h-5 w-5" />
                           ) : (
                             <CircleIcon className="h-5 w-5" />
@@ -459,7 +513,7 @@ function MainFeature({ onTasksUpdate }) {
                         <div className="flex-1 min-w-0">
                           <h3 
                             className={`text-base font-medium mb-1 ${
-                              task.isCompleted 
+                              task.is_completed 
                                 ? 'line-through text-surface-500 dark:text-surface-500' 
                                 : 'text-surface-800 dark:text-surface-200'
                             }`}
@@ -470,7 +524,7 @@ function MainFeature({ onTasksUpdate }) {
                           {task.description && (
                             <p 
                               className={`text-sm mb-2 break-words ${
-                                task.isCompleted 
+                                task.is_completed 
                                   ? 'text-surface-500 dark:text-surface-500' 
                                   : 'text-surface-600 dark:text-surface-400'
                               }`}
@@ -483,7 +537,7 @@ function MainFeature({ onTasksUpdate }) {
                             {getPriorityBadge(task.priority)}
                             
                             <span className="text-xs">
-                              Created: {format(new Date(task.createdAt), 'MMM d, yyyy')}
+                              Created: {format(new Date(task.created_at), 'MMM d, yyyy')}
                             </span>
                           </div>
                         </div>

@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-toastify';
 import getIcon from '../utils/iconUtils';
+import { AuthContext } from '../App';
+import { useSelector } from 'react-redux';
+import { fetchTaskStats } from '../services/TaskService';
 import MainFeature from '../components/MainFeature';
 
 function Home() {
@@ -14,25 +17,34 @@ function Home() {
   const [isLoading, setIsLoading] = useState(true);
   
   const HomeIcon = getIcon('Home');
+  const LogoutIcon = getIcon('LogOut');
   const CheckCircleIcon = getIcon('CheckCircle');
   const ClockIcon = getIcon('Clock');
   const ListTodoIcon = getIcon('ListTodo');
   
+  const { logout } = useContext(AuthContext);
+  const user = useSelector(state => state.user.user);
+  
   useEffect(() => {
-    // Simulate loading tasks from storage
-    const timeout = setTimeout(() => {
-      const savedTasks = JSON.parse(localStorage.getItem('tasks')) || [];
-      
-      setStats({
-        total: savedTasks.length,
-        completed: savedTasks.filter(task => task.isCompleted).length,
-        pending: savedTasks.filter(task => !task.isCompleted).length
-      });
-      
-      setIsLoading(false);
-    }, 800);
-    
-    return () => clearTimeout(timeout);
+    // Load task statistics from the database
+    async function loadTaskStats() {
+      try {
+        setIsLoading(true);
+        const statsData = await fetchTaskStats();
+        
+        setStats({
+          total: statsData.total,
+          completed: statsData.completed,
+          pending: statsData.pending
+        });
+      } catch (error) {
+        console.error('Error loading task statistics:', error);
+        toast.error('Failed to load task statistics');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadTaskStats();
   }, []);
 
   // Handle task updates to refresh statistics
@@ -58,12 +70,20 @@ function Home() {
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex items-center">
-              <ListTodoIcon className="h-8 w-8 mr-3" />
+              <ListTodoIcon className="h-7 w-7 mr-3" />
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight">TaskFlow</h1>
             </div>
-            <p className="text-sm md:text-base text-white text-opacity-90">
-              Organize your tasks efficiently and boost your productivity
-            </p>
+            <div className="flex items-center gap-4">
+              <p className="text-sm md:text-base text-white text-opacity-90">
+                Welcome, {user?.firstName || 'User'}
+              </p>
+              <button 
+                onClick={logout}
+                className="bg-white bg-opacity-20 hover:bg-opacity-30 text-white py-1 px-3 rounded-md text-sm flex items-center transition-colors"
+              >
+                <LogoutIcon className="h-4 w-4 mr-1" /> Logout
+              </button>
+            </div>
           </div>
         </div>
       </header>
