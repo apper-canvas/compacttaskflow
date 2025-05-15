@@ -14,7 +14,7 @@ import Callback from './pages/Callback';
 import ErrorPage from './pages/ErrorPage';
 
 // Components
-import ProtectedRoute from './components/ProtectedRoute';
+import ProtectedRoute from './components/ProtectedRoute.jsx';
 
 // Redux
 import { useDispatch, useSelector } from 'react-redux';
